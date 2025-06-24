@@ -1,94 +1,101 @@
-// No external libraries needed, making it faster.
+// Import the Airtable library
+const Airtable = require('airtable');
 
+// Define system prompts for different groups
 const systemPrompts = {
-    heuristic: `你是一位针对大学生的苏格拉底式写作导师。你的核心目标是激发学生的深度思考和自我修正能力，而不是直接提供答案。你必须遵循以下步骤：1. 仔细阅读学生提供的文本。2. 从以下四个维度进行分析：论点清晰度 (Argument Clarity)、证据支持 (Evidential Support)、逻辑结构 (Logical Structure) 和语言表达 (Language Expression)。3. 针对你发现的主要问题，提出具体的、引导性的问题来启发学生。严禁直接给出修改建议或重写句子。4. 你的反馈必须使用中文，并在关键概念或引导性问题后用括号附上英文翻译。请以清晰的列表形式呈现你的反馈。
-    提问范例：
-    - 针对论点：“我注意到你的核心论点是[...]。为了让它更有说服力，你觉得还可以从哪些角度来强化它？(How could you strengthen this argument from other perspectives?)”
-    - 针对证据：“你在这里用了一个例子来支撑你的观点。你认为这个例子和你的论点之间的联系足够紧密吗？(Is the connection between this example and your argument strong enough?)”
-    - 针对结构：“我看到你先讨论了A，然后讨论了B。你觉得这两个部分之间的过渡是否自然？(Is the transition between these two parts smooth?)”
-    - 针对表达：“这句话‘i just wants to give you something to see’似乎可以有多种理解。你最想表达的核心意思是什么？(What is the core meaning you want to express with this sentence?)”`,
+    heuristic: `You are a Socratic writing tutor for a university student. Your goal is to stimulate the student's deep thinking and self-correction abilities. You are strictly forbidden from giving direct answers, corrections, or rewritten text. You MUST guide the student by only asking probing and reflective questions.
+
+    When you analyze the student's text, identify areas of weakness (e.g., unclear argument, weak evidence, awkward phrasing, potential logical fallacies). For each area, formulate a question to help the student think more deeply.
     
-    instructive: `你是一位严谨的、面向大学生的写作批改助手。你的任务是精确地找出文本中的具体错误，并提供清晰的修改方案和解释。你必须遵循以下步骤：1. 逐句分析学生提供的文本，找出语法错误、拼写错误、不恰当的用词或句子结构问题。2. 对于每一个发现的错误，你必须按照以下固定格式进行反馈。3. 你的反馈和解释必须使用中文。
-    固定反馈格式：
-    - **原文 (Original):** [这里是学生有问题的原句]
-    - **建议 (Suggested):** [这里是你提供的修改后的句子]
-    - **原因 (Reason):** [这里用简洁的中文解释为什么需要这样修改，例如：主谓不一致、时态错误、用词不当等]`
+    Example interactions:
+    - If the argument is weak, ask: "What is the core evidence supporting this particular claim? How might someone argue against this point?"
+    - If a sentence is unclear, ask: "Could you try to explain the main idea of this sentence in a different way? What is the key message you want the reader to take away?"
+    
+    Do not praise or criticize. Only ask guiding questions to foster reflection.`,
+    
+    instructive: `You are a meticulous writing proofreader for a university student. Your only task is to identify grammatical errors, spelling mistakes, awkward phrasing, and unclear sentences. For each issue you find, you must provide a direct correction or a rewritten version of the sentence.
+
+    You are strictly forbidden from asking questions, providing general advice, or discussing the content's ideas. Your feedback must be specific, actionable, and corrective.
+    
+    Format your feedback clearly, for example:
+    - **Original:** "He go to the store yesterday."
+      **Suggested:** "He went to the store yesterday."
+    - **Original:** "The data which was collected shows a trend."
+      **Suggested:** "The collected data shows a trend."
+    
+    Provide a list of these direct corrections.`
 };
 
-// Simplified logging function using native fetch
-async function logToAirtable(data) {
-    const AIRTABLE_API_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Log`;
-    
-    const body = JSON.stringify({
-        records: [{ fields: data }]
-    });
-
-    try {
-        await fetch(AIRTABLE_API_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: body
-        });
-        console.log('Airtable logging successful for:', data.Participant_ID);
-    } catch (error) {
-        console.error('Airtable logging failed:', error);
-    }
-}
-
-// Use the standard 'exports.handler' for maximum compatibility
-exports.handler = async (event) => {
+exports.handler = async function (event, context) {
+    // 1. Check if the request method is POST
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
     }
 
     try {
+        // 2. Parse the incoming data from the frontend
         const { participantId, group, inputText } = JSON.parse(event.body);
-        const systemPrompt = systemPrompts[group];
 
+        // 3. Get the correct system prompt for the group
+        const systemPrompt = systemPrompts[group];
         if (!systemPrompt) {
             return { statusCode: 400, body: JSON.stringify({ error: 'Invalid group specified.' }) };
         }
 
+        // 4. Call the DeepSeek API
         const deepseekResponse = await fetch('https://api.deepseek.com/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                // IMPORTANT: Use environment variables for your API keys!
                 'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
             },
             body: JSON.stringify({
                 model: "deepseek-chat",
-                messages: [{ role: "system", content: systemPrompt }, { role: "user", content: inputText }],
-                temperature: group === 'heuristic' ? 0.7 : 0.2,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: inputText }
+                ],
+                temperature: group === 'heuristic' ? 0.7 : 0.2, // Higher temp for more creative questions, lower for direct corrections
             })
         });
 
         if (!deepseekResponse.ok) {
             const errorData = await deepseekResponse.json();
-            throw new Error(errorData.error?.message || 'DeepSeek API returned an error');
+            console.error('DeepSeek API Error:', errorData);
+            throw new Error(`DeepSeek API Error: ${errorData.error.message}`);
         }
 
         const deepseekData = await deepseekResponse.json();
         const aiFeedback = deepseekData.choices[0].message.content;
 
-        // Log data in the background (fire-and-forget)
-        logToAirtable({
-            'Participant_ID': participantId,
-            'Group': group,
-            'Input_Text': inputText,
-            'AI_Feedback': aiFeedback
-        });
+        // 5. Log the data to Airtable
+        try {
+            const airtableBase = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
+            await airtableBase('Log').create([
+                {
+                    fields: {
+                        'Participant_ID': participantId,
+                        'Group': group,
+                        'Input_Text': inputText,
+                        'AI_Feedback': aiFeedback
+                    }
+                }
+            ]);
+        } catch (airtableError) {
+            // Log the Airtable error but don't fail the entire request.
+            // The student should still get their feedback even if logging fails.
+            console.error('Airtable logging failed:', airtableError);
+        }
 
-        // Immediately return the feedback to the user
+        // 6. Return the AI feedback to the frontend
         return {
             statusCode: 200,
             body: JSON.stringify({ feedback: aiFeedback })
         };
 
     } catch (error) {
-        console.error('Handler error:', error.toString());
+        console.error('Server-side error:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: error.message })

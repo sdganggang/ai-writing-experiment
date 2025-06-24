@@ -1,0 +1,11 @@
+{
+  "name": "ai-writing-experiment-backend",
+  "version": "1.0.0",
+  "description": "Backend function for the AI writing experiment.",
+  "dependencies": {
+    "airtable": "^0.12.2"
+  },
+  "netlify": {
+    "functions": "./netlify/functions/"
+  }
+}

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI辅助写作工具 / AI-Assisted Writing Tool</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 20px auto; padding: 0 20px; background-color: #f8f9fa; }
+        .container { background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1, h2 { color: #0056b3; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
+        h1 p, h2 p { font-size: 0.7em; color: #6c757d; margin-top: -5px; }
+        label { display: block; font-weight: bold; margin-top: 20px; margin-bottom: 5px; }
+        label p { font-size: 0.7em; font-weight: normal; color: #6c757d; margin-top: -2px; }
+        input[type="text"], textarea { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ced4da; font-size: 16px; box-sizing: border-box; }
+        textarea { height: 300px; resize: vertical; }
+        button { display: block; width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 18px; cursor: pointer; margin-top: 20px; transition: background-color 0.3s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .feedback-section { margin-top: 30px; padding: 20px; background-color: #f1f3f5; border: 1px solid #e9ecef; border-radius: 4px; white-space: pre-wrap; }
+        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #007bff; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error-message { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="main-title">AI辅助写作工具
+            <p>AI-Assisted Writing Tool</p>
+        </h1>
+        
+        <div>
+            <label for="participantId">请输入您的实验编号
+                <p>Please enter your Participant ID</p>
+            </label>
+            <input type="text" id="participantId" placeholder="例如：P01 / e.g., P01">
+        </div>
+
+        <div>
+            <label for="essayText">请输入您的作文文本
+                <p>Please enter your essay text</p>
+            </label>
+            <textarea id="essayText" placeholder="在此处撰写您的文章... / Write your essay here..."></textarea>
+        </div>
+
+        <button id="getFeedbackBtn">获取反馈 / Get Feedback</button>
+
+        <div class="loader" id="loader"></div>
+
+        <div class="feedback-section" id="feedback-container" style="display: none;">
+            <h2 id="feedback-title">AI反馈
+                <p>AI Feedback</p>
+            </h2>
+            <div id="feedback-output"></div>
+        </div>
+    </div>
+
+    <script>
+        const getFeedbackBtn = document.getElementById('getFeedbackBtn');
+        const participantIdInput = document.getElementById('participantId');
+        const essayTextInput = document.getElementById('essayText');
+        const feedbackOutput = document.getElementById('feedback-output');
+        const feedbackContainer = document.getElementById('feedback-container');
+        const loader = document.getElementById('loader');
+        const mainTitle = document.getElementById('main-title');
+        const feedbackTitle = document.getElementById('feedback-title');
+
+        // Get group from URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const group = urlParams.get('group') || 'control'; // Default to control if no group is specified
+
+        // Update titles based on group
+        if (group === 'heuristic') {
+            mainTitle.innerHTML = 'AI辅助写作工具 (启发式反馈版)<p>AI-Assisted Writing Tool (Heuristic Feedback Version)</p>';
+            feedbackTitle.innerHTML = 'AI导师反馈<p>AI Tutor Feedback</p>';
+        } else if (group === 'instructive') {
+            mainTitle.innerHTML = 'AI辅助写作工具 (指令式反馈版)<p>AI-Assisted Writing Tool (Instructive Feedback Version)</p>';
+            feedbackTitle.innerHTML = 'AI助手反馈<p>AI Assistant Feedback</p>';
+        } else { // control group
+            mainTitle.innerHTML = '学术写作环境<p>Academic Writing Environment</p>';
+            getFeedbackBtn.textContent = '获取反馈 (当前组别不可用) / Get Feedback (Not available for this group)';
+            getFeedbackBtn.disabled = true;
+        }
+
+        if (group !== 'control') {
+            getFeedbackBtn.addEventListener('click', async () => {
+                const participantId = participantIdInput.value.trim();
+                const essayText = essayTextInput.value.trim();
+
+                if (!participantId || !essayText) {
+                    alert('请输入实验编号和作文文本。\nPlease enter both a Participant ID and your essay text.');
+                    return;
+                }
+
+                loader.style.display = 'block';
+                getFeedbackBtn.disabled = true;
+                feedbackContainer.style.display = 'none';
+                feedbackOutput.textContent = '';
+
+                try {
+                    const response = await fetch('/.netlify/functions/get-feedback', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            participantId: participantId,
+                            group: group,
+                            inputText: essayText
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || '服务器发生未知错误 (Unknown server error)');
+                    }
+
+                    const data = await response.json();
+                    feedbackOutput.textContent = data.feedback;
+                    feedbackContainer.style.display = 'block';
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    feedbackOutput.innerHTML = `<span class="error-message">加载反馈时出错：${error.message}<br>请联系研究人员。</span><br><span class="error-message">An error occurred while fetching feedback: ${error.message}<br>Please contact the researcher.</span>`;
+                    feedbackContainer.style.display = 'block';
+                } finally {
+                    loader.style.display = 'none';
+                    getFeedbackBtn.disabled = false;
+                }
+            });
+        }
+    </script>
+</body>
+</html>

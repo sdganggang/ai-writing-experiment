@@ -1,0 +1,4 @@
+# 忽略 node_modules 文件夹（依赖包，体积大且可通过 package.json 重装）
+node_modules/  
+# 忽略 .git 文件夹（本地 Git 仓库信息，远程仓库有自己的版本控制数据）
+.git/ 

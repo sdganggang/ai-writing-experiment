@@ -1,5 +1,4 @@
-// Use the modern ES module 'import' syntax
-import Airtable from 'airtable';
+// No external libraries needed, making it faster.
 
 const systemPrompts = {
     heuristic: `你是一位针对大学生的苏格拉底式写作导师。你的核心目标是激发学生的深度思考和自我修正能力，而不是直接提供答案。你必须遵循以下步骤：1. 仔细阅读学生提供的文本。2. 从以下四个维度进行分析：论点清晰度 (Argument Clarity)、证据支持 (Evidential Support)、逻辑结构 (Logical Structure) 和语言表达 (Language Expression)。3. 针对你发现的主要问题，提出具体的、引导性的问题来启发学生。严禁直接给出修改建议或重写句子。4. 你的反馈必须使用中文，并在关键概念或引导性问题后用括号附上英文翻译。请以清晰的列表形式呈现你的反馈。
@@ -16,18 +15,31 @@ const systemPrompts = {
     - **原因 (Reason):** [这里用简洁的中文解释为什么需要这样修改，例如：主谓不一致、时态错误、用词不当等]`
 };
 
+// Simplified logging function using native fetch
 async function logToAirtable(data) {
+    const AIRTABLE_API_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Log`;
+    
+    const body = JSON.stringify({
+        records: [{ fields: data }]
+    });
+
     try {
-        const airtableBase = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
-        await airtableBase('Log').create([{ fields: data }]);
-        console.log('Airtable logging successful for Participant:', data.Participant_ID);
+        await fetch(AIRTABLE_API_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: body
+        });
+        console.log('Airtable logging successful for:', data.Participant_ID);
     } catch (error) {
-        console.error('Airtable logging failed:', error.toString());
+        console.error('Airtable logging failed:', error);
     }
 }
 
-// Use 'export const handler' for modern ES module functions
-export const handler = async (event) => {
+// Use the standard 'exports.handler' for maximum compatibility
+exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
     }
@@ -61,6 +73,7 @@ export const handler = async (event) => {
         const deepseekData = await deepseekResponse.json();
         const aiFeedback = deepseekData.choices[0].message.content;
 
+        // Log data in the background (fire-and-forget)
         logToAirtable({
             'Participant_ID': participantId,
             'Group': group,
@@ -68,6 +81,7 @@ export const handler = async (event) => {
             'AI_Feedback': aiFeedback
         });
 
+        // Immediately return the feedback to the user
         return {
             statusCode: 200,
             body: JSON.stringify({ feedback: aiFeedback })

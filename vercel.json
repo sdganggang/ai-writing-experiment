@@ -1,7 +1,21 @@
 {
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/get-feedback.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/get-feedback",
+      "dest": "/api/get-feedback"
+    }
+  ],
   "functions": {
     "api/get-feedback.js": {
-      "maxDuration": 25
+      "maxDuration": 30,
+      "memory": 512
     }
   }
 }

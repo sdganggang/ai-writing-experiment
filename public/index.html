@@ -97,7 +97,7 @@
                 feedbackOutput.textContent = '';
 
                 try {
-                    const response = await fetch('/.netlify/functions/get-feedback', {
+                    const response = await fetch('/api/get-feedback', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

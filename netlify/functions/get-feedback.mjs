@@ -4,21 +4,15 @@ import jwt from 'jsonwebtoken';
 
 // Function to generate the API token for Zhipu AI
 const generateToken = (apiKey, expSeconds) => {
-    // Basic validation for the API key format
     if (!apiKey || typeof apiKey !== 'string' || !apiKey.includes('.')) {
-        throw new Error('Invalid Zhipu API Key format provided.');
+        throw new Error('Invalid Zhipu API Key format.');
     }
     const [id, secret] = apiKey.split('.');
-    
-    // **CRITICAL FIX**: Both timestamp and exp must be in SECONDS.
-    const nowInSeconds = Math.floor(Date.now() / 1000);
-
     const payload = {
         api_key: id,
-        exp: nowInSeconds + expSeconds,
-        timestamp: nowInSeconds, // Use seconds, NOT milliseconds
+        exp: Math.floor(Date.now() / 1000) + expSeconds,
+        timestamp: Date.now(),
     };
-    
     return jwt.sign(payload, secret, { algorithm: 'HS256', header: { alg: 'HS256', sign_type: 'SIGN' } });
 };
 
@@ -30,8 +24,8 @@ const systemPrompts = {
 const logToAirtable = async (data) => {
     const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID } = process.env;
     if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-        console.error("Airtable environment variables not set. Skipping log.");
-        return;
+        console.error("Airtable environment variables not set.");
+        return; // Don't block the function if logging fails
     }
 
     const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Log`;
@@ -41,9 +35,7 @@ const logToAirtable = async (data) => {
         });
         console.log(`Airtable log successful for Participant: ${data.Participant_ID}`);
     } catch (error) {
-        // Log the specific error from Airtable for better debugging
-        const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-        console.error("Airtable logging failed:", errorMessage);
+        console.error("Airtable logging failed:", error.response ? error.response.data : error.message);
     }
 };
 
@@ -77,8 +69,7 @@ export const handler = async (event) => {
 
         const aiFeedback = zhipuResponse.data.choices[0].message.content;
         
-        // Log to Airtable in the background. Don't wait for it.
-        // This is a "fire-and-forget" call.
+        // Log to Airtable in the background, but don't wait for it to finish
         logToAirtable({
             'Participant_ID': participantId,
             'Group': group,
@@ -92,11 +83,10 @@ export const handler = async (event) => {
         };
 
     } catch (error) {
-        const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-        console.error("Handler Error:", errorMessage);
+        console.error("Handler Error:", error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'An unknown server error occurred.' }),
+            body: JSON.stringify({ error: error.message || 'An unknown server error occurred.' }),
         };
     }
 };

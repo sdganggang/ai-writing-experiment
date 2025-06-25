@@ -1,8 +1,9 @@
 {
   "name": "ai-writing-experiment-functions",
   "version": "1.0.0",
-  "description": "Netlify functions for the AI writing experiment",
+  "description": "Functions for the AI writing experiment",
   "dependencies": {
-    "axios": "^1.6.8"
+    "axios": "^1.6.8",
+    "jsonwebtoken": "^9.0.2"
   }
 }

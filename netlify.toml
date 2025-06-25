@@ -1,2 +1,4 @@
+# Set the timeout for all functions to 26 seconds
 [functions."*"]
-  timeout = 25
+  timeout = 26
+  node_bundler = "esbuild"

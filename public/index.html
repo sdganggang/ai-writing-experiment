@@ -24,21 +24,15 @@
 </head>
 <body>
     <div class="container">
-        <h1 id="main-title">AI辅助写作工具
-            <p>AI-Assisted Writing Tool</p>
-        </h1>
+        <h1 id="main-title">AI辅助写作工具 <p>AI-Assisted Writing Tool</p></h1>
         
         <div>
-            <label for="participantId">请输入您的实验编号
-                <p>Please enter your Participant ID</p>
-            </label>
+            <label for="participantId">请输入您的实验编号 <p>Please enter your Participant ID</p></label>
             <input type="text" id="participantId" placeholder="例如：P01 / e.g., P01">
         </div>
 
         <div>
-            <label for="essayText">请输入您的作文文本
-                <p>Please enter your essay text</p>
-            </label>
+            <label for="essayText">请输入您的作文文本 <p>Please enter your essay text</p></label>
             <textarea id="essayText" placeholder="在此处撰写您的文章... / Write your essay here..."></textarea>
         </div>
 
@@ -47,9 +41,7 @@
         <div class="loader" id="loader"></div>
 
         <div class="feedback-section" id="feedback-container" style="display: none;">
-            <h2 id="feedback-title">AI反馈
-                <p>AI Feedback</p>
-            </h2>
+            <h2 id="feedback-title">AI反馈 <p>AI Feedback</p></h2>
             <div id="feedback-output"></div>
         </div>
     </div>
@@ -64,70 +56,73 @@
         const mainTitle = document.getElementById('main-title');
         const feedbackTitle = document.getElementById('feedback-title');
 
-        // Get group from URL parameter
         const urlParams = new URLSearchParams(window.location.search);
-        const group = urlParams.get('group') || 'control'; // Default to control if no group is specified
+        const group = urlParams.get('group') || 'control';
 
-        // Update titles based on group
-        if (group === 'heuristic') {
-            mainTitle.innerHTML = 'AI辅助写作工具 (启发式反馈版)<p>AI-Assisted Writing Tool (Heuristic Feedback Version)</p>';
-            feedbackTitle.innerHTML = 'AI导师反馈<p>AI Tutor Feedback</p>';
-        } else if (group === 'instructive') {
-            mainTitle.innerHTML = 'AI辅助写作工具 (指令式反馈版)<p>AI-Assisted Writing Tool (Instructive Feedback Version)</p>';
-            feedbackTitle.innerHTML = 'AI助手反馈<p>AI Assistant Feedback</p>';
-        } else { // control group
-            mainTitle.innerHTML = '学术写作环境<p>Academic Writing Environment</p>';
-            getFeedbackBtn.textContent = '获取反馈 (当前组别不可用) / Get Feedback (Not available for this group)';
-            getFeedbackBtn.disabled = true;
-        }
-
-        if (group !== 'control') {
-            getFeedbackBtn.addEventListener('click', async () => {
-                const participantId = participantIdInput.value.trim();
-                const essayText = essayTextInput.value.trim();
-
-                if (!participantId || !essayText) {
-                    alert('请输入实验编号和作文文本。\nPlease enter both a Participant ID and your essay text.');
-                    return;
-                }
-
-                loader.style.display = 'block';
+        // Update titles and button state based on the URL parameter
+        const setupUI = () => {
+            if (group === 'heuristic') {
+                mainTitle.innerHTML = 'AI辅助写作工具 (启发式反馈版)<p>AI-Assisted Writing Tool (Heuristic Feedback Version)</p>';
+                feedbackTitle.innerHTML = 'AI导师反馈<p>AI Tutor Feedback</p>';
+            } else if (group === 'instructive') {
+                mainTitle.innerHTML = 'AI辅助写作工具 (指令式反馈版)<p>AI-Assisted Writing Tool (Instructive Feedback Version)</p>';
+                feedbackTitle.innerHTML = 'AI助手反馈<p>AI Assistant Feedback</p>';
+            } else {
+                mainTitle.innerHTML = '学术写作环境<p>Academic Writing Environment</p>';
+                getFeedbackBtn.textContent = '获取反馈 (当前组别不可用) / Get Feedback (Not available for this group)';
                 getFeedbackBtn.disabled = true;
-                feedbackContainer.style.display = 'none';
-                feedbackOutput.textContent = '';
+            }
+        };
 
-                try {
-                    const response = await fetch('/.netlify/functions/get-feedback', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            participantId: participantId,
-                            group: group,
-                            inputText: essayText
-                        })
-                    });
+        const handleFeedbackRequest = async () => {
+            const participantId = participantIdInput.value.trim();
+            const essayText = essayTextInput.value.trim();
 
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || '服务器发生未知错误 (Unknown server error)');
-                    }
+            if (!participantId || !essayText) {
+                alert('请输入实验编号和作文文本。\nPlease enter both a Participant ID and your essay text.');
+                return;
+            }
 
-                    const data = await response.json();
-                    feedbackOutput.textContent = data.feedback;
-                    feedbackContainer.style.display = 'block';
+            loader.style.display = 'block';
+            getFeedbackBtn.disabled = true;
+            feedbackContainer.style.display = 'none';
 
-                } catch (error) {
-                    console.error('Error:', error);
-                    feedbackOutput.innerHTML = `<span class="error-message">加载反馈时出错：${error.message}<br>请联系研究人员。</span><br><span class="error-message">An error occurred while fetching feedback: ${error.message}<br>Please contact the researcher.</span>`;
-                    feedbackContainer.style.display = 'block';
-                } finally {
-                    loader.style.display = 'none';
-                    getFeedbackBtn.disabled = false;
+            try {
+                // The function URL is relative to the site root
+                const response = await fetch(`/.netlify/functions/get-feedback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        participantId,
+                        group,
+                        inputText: essayText
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || '服务器发生未知错误 (Unknown server error)');
                 }
-            });
-        }
+
+                feedbackOutput.textContent = data.feedback;
+
+            } catch (error) {
+                console.error('Fetch Error:', error);
+                feedbackOutput.innerHTML = `<span class="error-message">加载反馈时出错: ${error.message}<br>请联系研究人员。</span><br><span class="error-message">An error occurred while fetching feedback: ${error.message}<br>Please contact the researcher.</span>`;
+            } finally {
+                loader.style.display = 'none';
+                feedbackContainer.style.display = 'block';
+                getFeedbackBtn.disabled = false;
+            }
+        };
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            setupUI();
+            if (group !== 'control') {
+                getFeedbackBtn.addEventListener('click', handleFeedbackRequest);
+            }
+        });
     </script>
 </body>
 </html>
